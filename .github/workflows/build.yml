@@ -20,9 +20,10 @@ jobs:
           - os: windows-latest
             platform: windows
             arch: x86_64
-          - os: macos-latest
-            platform: macos
-            arch: arm64
+          # Removed MacOS to avoid billing too much for it
+          #- os: macos-latest
+          #  platform: macos
+          #  arch: arm64
 
     steps:
       # Checkout Code (Recursive is CRITICAL for libuv/godot-cpp)
@@ -53,11 +54,53 @@ jobs:
       - name: Compile GDExtensions
         working-directory: src
         run: |
-          scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_debug dev_build=yes -j2
+          scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_release -j2
       
-      # Verify Output
-      - name: Verify Binaries Exist
+      # --- Cache Logic for Godot Engine ---
+      
+      # We generate a hash based on the current commit of the 'engine' submodule.
+      # If we update the submodule to a new Godot version, the hash changes, and we rebuild.
+      - name: Get Engine Submodule Hash
+        id: engine-hash
         shell: bash
         run: |
-          echo "Checking game/bin/ for binaries..."
-          ls -R game/bin/
+          echo "hash=$(git submodule status engine | awk '{print $1}' | tr -d '+-')" >> $GITHUB_OUTPUT
+
+      - name: Cache Godot Engine
+        id: cache-engine
+        uses: actions/cache@v4
+        with:
+          path: engine/bin
+          # Key includes OS, Arch, and the specific commit of the engine submodule
+          key: godot-engine-release-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.engine-hash.outputs.hash }}
+
+      # --- Build Engine (Only on Cache Miss) ---
+      - name: Build Godot Engine (Release Template)
+        if: steps.cache-engine.outputs.cache-hit != 'true'
+        working-directory: engine
+        run: |
+          echo "⚠️ Cache Miss! Building Engine from source..."
+          scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_release -j4
+
+      # --- The Smoke Test ---
+      - name: Run Smoke Test
+        shell: bash
+        run: |
+          echo "🔥 Starting Smoke Test..."
+          
+          if [ "${{ matrix.platform }}" == "windows" ]; then
+            BIN="./engine/bin/godot.windows.template_release.x86_64.exe"
+          elif [ "${{ matrix.platform }}" == "macos" ]; then
+            BIN="./engine/bin/godot.macos.template_release.arm64"
+            chmod +x $BIN
+          else
+            BIN="./engine/bin/godot.linux.template_release.x86_64"
+            chmod +x $BIN
+          fi
+
+          echo "Running with: $BIN"
+          
+          # Run headless and quit immediately upon success
+          $BIN --headless --path game/ --quit
+          
+          echo "✅ Smoke Test Passed"
