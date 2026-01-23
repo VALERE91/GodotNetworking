@@ -139,6 +139,8 @@ src/godot-cpp/bin/
 src/**/*.o
 src/**/*.os
 src/godot-cpp/**/*.o
+.cache/
+src/.cache
 
 # Ignore Compilation Database (It is machine specific)
 compile_commands.json
