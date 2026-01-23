@@ -94,7 +94,7 @@ jobs:
             BIN="./engine/bin/godot.macos.template_release.arm64"
             chmod +x $BIN
           else
-            BIN="./engine/bin/godot.linux.template_release.x86_64"
+            BIN="./engine/bin/godot.linuxbsd.template_release.x86_64"
             chmod +x $BIN
           fi
 
