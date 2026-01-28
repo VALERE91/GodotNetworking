@@ -88,6 +88,30 @@ jobs:
           echo "⚠️ Cache Miss! Building Engine from source..."
           scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_release disable_path_overrides=no -j4
 
+      # --- The "Warm Up" (Import Assets) ---
+      # We run the EDITOR in headless mode just to let it scan the folder.
+      - name: Import Project Assets
+        shell: bash
+        run: |
+          echo "📦 Importing Assets..."
+          
+          if [ "${{ matrix.platform }}" == "windows" ]; then
+            EDITOR="./engine/bin/godot.windows.editor.x86_64.exe"
+          elif [ "${{ matrix.platform }}" == "macos" ]; then
+            EDITOR="./engine/bin/godot.macos.editor.arm64"
+            chmod +x $EDITOR
+          else
+            EDITOR="./engine/bin/godot.linuxbsd.editor.x86_64"
+            chmod +x $EDITOR
+          fi
+
+          # --headless: Don't open a window
+          # --editor: Run in editor mode
+          # --quit: Exit as soon as import is done
+          $EDITOR --headless --path game/ --editor --quit
+          
+          echo "✅ Import Complete."
+
       # --- The Smoke Test ---
       - name: Run Smoke Test
         shell: bash
